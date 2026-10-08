@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!-- 手机自适应核心标签 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>骨语推拿 - 会员登记</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Microsoft Yahei",sans-serif}
+body{background:#f7f3ef;padding:12px;color:#333;font-size:16px}
+.container{max-width:100%;margin:0 auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 2px 10px #00000012}
+h1{text-align:center;color:#8b5a2b;margin-bottom:16px;font-size:20px}
+.tabs{display:flex;margin-bottom:16px}
+.tab{flex:1;text-align:center;padding:12px;border:1px solid #ddd;cursor:pointer;background:#f9f6f2;font-size:15px}
+.tab.active{background:#8b5a2b;color:#fff;border-color:#8b5a2b}
+.panel{display:none}
+.panel.show{display:block}
+.form-item{margin-bottom:12px}
+label{display:block;margin-bottom:4px;font-weight:500}
+input,select,textarea{width:100%;padding:12px;border:1px solid #ccc;border-radius:6px;font-size:16px}
+button{padding:12px 8px;border:none;border-radius:6px;background:#8b5a2b;color:#fff;font-size:15px;cursor:pointer;margin:3px 0;width:100%}
+button.del{background:#c44536}
+button.export{background:#2b8b5a}
+button.log{background:#487eb0}
+button.recharge{background:#2b6b8b}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
+th,td{border:1px solid #ddd;padding:6px 2px;text-align:center}
+th{background:#f3ede5}
+.search-box{display:flex;gap:6px;margin-bottom:12px}
+.search-box input{flex:1}
+.tip{color:#666;font-size:13px;margin:8px 0}
+
+/* 弹窗样式 手机适配 */
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999;padding:10px}
+.modal-content{background:#fff;width:100%;margin:10px auto;padding:16px;border-radius:10px;max-height:90vh;overflow:auto}
+.modal.show{display:block}
+.modal-title{font-size:18px;margin-bottom:16px;color:#8b5a2b;text-align:center}
+.log-item{border:1px solid #eee;padding:8px;margin:6px 0;border-radius:6px;text-align:left;font-size:14px}
+.log-title{font-weight:bold}
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>骨语推拿 · 会员登记</h1>
+    <div class="tabs">
+        <div class="tab active" data-tab="add">新增会员</div>
+        <div class="tab" data-tab="list">会员列表</div>
+    </div>
+
+    <!-- 新增会员面板 -->
+    <div class="panel show" id="add">
+        <div class="form-item">
+            <label>会员姓名 *</label>
+            <input type="text" id="name" placeholder="请输入姓名">
+        </div>
+        <div class="form-item">
+            <label>手机号码 *</label>
+            <input type="tel" id="phone" placeholder="手机号">
+        </div>
+        <div class="form-item">
+            <label>性别</label>
+            <select id="gender">
+                <option value="男">男</option>
+                <option value="女">女</option>
+            </select>
+        </div>
+        <div class="form-item">
+            <label>出生日期</label>
+            <input type="date" id="birthday">
+        </div>
+        <div class="form-item">
+            <label>会员类型</label>
+            <select id="mtype">
+                <option value="普通会员">普通会员</option>
+                <option value="次卡会员">次卡会员</option>
+                <option value="储值会员">储值会员</option>
+            </select>
+        </div>
+        <div class="form-item">
+            <label>剩余次数 / 储值金额</label>
+            <input type="number" id="balance" placeholder="次卡填次数，储值填余额">
+        </div>
+        <div class="form-item">
+            <label>备注（身体情况/喜好）</label>
+            <textarea id="remark" rows="3" placeholder="腰突、颈椎不适，偏好力度等"></textarea>
+        </div>
+        <div class="form-item">
+            <label>登记时间</label>
+            <input type="text" id="regtime" readonly>
+        </div>
+        <button onclick="addMember()">保存会员信息</button>
+        <div class="tip">⚠️数据保存在本机浏览器，清理缓存会丢失，定期导出备份</div>
+    </div>
+
+    <!-- 会员列表&查询面板 -->
+    <div class="panel" id="list">
+        <div class="search-box">
+            <input type="text" id="searchKey" placeholder="姓名/手机号查询">
+            <button onclick="searchMember()" style="width:auto">查询</button>
+            <button class="export" onclick="exportCsv()" style="width:auto">导出</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>姓名</th>
+                    <th>手机号</th>
+                    <th>类型</th>
+                    <th>余额</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 修改会员弹窗 -->
+<div class="modal" id="editModal">
+    <div class="modal-content">
+        <div class="modal-title">修改会员信息</div>
+        <input type="hidden" id="editId">
+        <div class="form-item">
+            <label>会员姓名 *</label>
+            <input type="text" id="editName">
+        </div>
+        <div class="form-item">
+            <label>手机号码 *</label>
+            <input type="tel" id="editPhone">
+        </div>
+        <div class="form-item">
+            <label>性别</label>
+            <select id="editGender">
+                <option value="男">男</option>
+                <option value="女">女</option>
+            </select>
+        </div>
+        <div class="form-item">
+            <label>出生日期</label>
+            <input type="date" id="editBirthday">
+        </div>
+        <div class="form-item">
+            <label>会员类型</label>
+            <select id="editMtype">
+                <option value="普通会员">普通会员</option>
+                <option value="次卡会员">次卡会员</option>
+                <option value="储值会员">储值会员</option>
+            </select>
+        </div>
+        <div class="form-item">
+            <label>剩余次数 / 储值金额</label>
+            <input type="number" id="editBalance">
+        </div>
+        <div class="form-item">
+            <label>备注</label>
+            <textarea id="editRemark" rows="3"></textarea>
+        </div>
+        <button onclick="saveEdit()">保存修改</button>
+        <button class="del" onclick="closeModal()">取消</button>
+    </div>
+</div>
+
+<!-- 到店服务记录弹窗（带预设项目下拉） -->
+<div class="modal" id="logModal">
+    <div class="modal-content">
+        <div class="modal-title">会员到店服务记录</div>
+        <input type="hidden" id="logMemberId">
+        <div class="form-item">
+            <label>服务项目</label>
+            <select id="serviceItem">
+                <option value="">--选择项目，也可手动输入--</option>
+                <option value="全身推拿">全身推拿</option>
+                <option value="颈椎调理">颈椎调理</option>
+                <option value="腰背正骨">腰背正骨</option>
+                <option value="肩颈疏通">肩颈疏通</option>
+                <option value="筋膜放松">筋膜放松</option>
+                <option value="艾灸调理">艾灸调理</option>
+                <option value="拔罐">拔罐</option>
+                <option value="其他项目">其他项目</option>
+            </select>
+        </div>
+        <div class="form-item">
+            <label>扣减次数 / 消费金额</label>
+            <input type="number" id="serviceCost" placeholder="次卡填扣次数，储值填消费金额">
+        </div>
+        <div class="form-item">
+            <label>本次服务备注</label>
+            <textarea id="serviceRemark" rows="2" placeholder="身体感受、调理情况"></textarea>
+        </div>
+        <button class="log" onclick="addServiceLog()">添加本次服务记录（自动扣次）</button>
+        <hr style="margin:16px 0">
+        <div style="font-weight:bold;margin-bottom:8px">历史服务记录：</div>
+        <div id="logList"></div>
+        <button style="margin-top:12px" onclick="closeLogModal()">关闭</button>
+    </div>
+</div>
+
+<!-- 储值充值弹窗【升级：充值套餐选择】 -->
+<div class="modal" id="rechargeModal">
+    <div class="modal-content">
+        <div class="modal-title">会员储值充值</div>
+        <input type="hidden" id="rechargeMemberId">
+        <div class="form-item">
+            <label>充值套餐</label>
+            <select id="rechargePackage" onchange="selectPackage()">
+                <option value="">自定义充值</option>
+                <option value="1000,200">充1000送200</option>
+                <option value="2000,500">充2000送500</option>
+                <option value="3000,800">充3000送800</option>
+                <option value="5000,1500">充5000送1500</option>
+            </select>
+        </div>
+        <div class="form-item">
+            <label>充值本金</label>
+            <input type="number" id="rechargeMoney" placeholder="输入本次充值本金">
+        </div>
+        <div class="form-item">
+            <label>赠送金额</label>
+            <input type="number" id="giftMoney" placeholder="充值赠送，无赠送填0">
+        </div>
+        <div class="form-item">
+            <label>充值备注</label>
+            <textarea id="rechargeRemark" rows="2" placeholder="如：活动充值，套餐等"></textarea>
+        </div>
+        <button class="recharge" onclick="addRecharge()">保存充值记录（余额自动增加）</button>
+        <hr style="margin:16px 0">
+        <div style="font-weight:bold;margin-bottom:8px">充值历史：</div>
+        <div id="rechargeList"></div>
+        <button style="margin-top:12px" onclick="closeRechargeModal()">关闭</button>
+    </div>
+</div>
+
+<script>
+//套餐选择自动填充本金和赠送金额
+function selectPackage(){
+    const val = document.getElementById('rechargePackage').value
+    if(val){
+        const [money,gift] = val.split(',')
+        document.getElementById('rechargeMoney').value = money
+        document.getElementById('giftMoney').value = gift
+    }else{
+        document.getElementById('rechargeMoney').value=''
+        document.getElementById('giftMoney').value='0'
+    }
+}
+
+// tab切换
+document.querySelectorAll('.tab').forEach(t=>{
+    t.onclick = ()=>{
+        document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'))
+        t.classList.add('active')
+        const tabid = t.dataset.tab
+        document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'))
+        document.getElementById(tabid).classList.add('show')
+        if(tabid==='list') renderTable()
+    }
+})
+
+// 获取当前时间
+function getNowTime(){
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+}
+document.getElementById('regtime').value = getNowTime()
+
+// 本地存储读写
+function getMembers(){
+    const raw = localStorage.getItem('guyu_members')
+    return raw ? JSON.parse(raw) : []
+}
+function saveMembers(list){
+    localStorage.setItem('guyu_members',JSON.stringify(list))
+}
+
+// 添加会员
+function addMember(){
+    const name = document.getElementById('name').value.trim()
+    const phone = document.getElementById('phone').value.trim()
+    if(!name || !phone){
+        alert('姓名和手机号不能为空！')
+        return
+    }
+    const member = {
+        id:Date.now(),
+        name,
+        phone,
+        gender:document.getElementById('gender').value,
+        birthday:document.getElementById('birthday').value,
+        mtype:document.getElementById('mtype').value,
+        balance:Number(document.getElementById('balance').value)||0,
+        remark:document.getElementById('remark').value,
+        regtime:getNowTime(),
+        logs:[], //服务记录
+        rechargeLogs:[] //充值记录
+    }
+    const list = getMembers()
+    list.push(member)
+    saveMembers(list)
+    alert('✅会员登记成功！')
+    //清空表单
+    document.getElementById('name').value=''
+    document.getElementById('phone').value=''
+    document.getElementById('balance').value=''
+    document.getElementById('remark').value=''
+    document.getElementById('birthday').value=''
+    document.getElementById('regtime').value = getNowTime()
+}
+
+//渲染表格
+function renderTable(data=null){
+    const list = data || getMembers()
+    const tb = document.getElementById('tableBody')
+    tb.innerHTML=''
+    if(list.length===0){
+        tb.innerHTML='<tr><td colspan="5">暂无会员数据</td></tr>'
+        return
+    }
+    list.forEach(item=>{
+        const tr = document.createElement('tr')
+        tr.innerHTML=`
+        <td>${item.name}</td>
+        <td>${item.phone}</td>
+        <td>${item.mtype}</td>
+        <td>${item.balance||0}</td>
+        <td>
+            <button onclick="openEdit(${item.id})">修改</button>
+            <button class="log" onclick="openLog(${item.id})">服务</button>
+            <button class="recharge" onclick="openRecharge(${item.id})">充值</button>
+            <button class="del" onclick="delMember(${item.id})">删</button>
+        </td>
+        `
+        tb.appendChild(tr)
+    })
+}
+
+//查询会员
+function searchMember(){
+    const key = document.getElementById('searchKey').value.trim().toLowerCase()
+    const all = getMembers()
+    const filter = all.filter(m=>m.name.includes(key) || m.phone.includes(key))
+    renderTable(filter)
+}
+
+//删除会员
+function delMember(id){
+    if(!confirm('确定删除该会员？会员档案+服务+充值记录全部删除，不可恢复！'))return
+    let list = getMembers()
+    list = list.filter(x=>x.id!==id)
+    saveMembers(list)
+    renderTable()
+}
+
+//==== 修改会员弹窗 ====
+function openEdit(id){
+    const list = getMembers()
+    const member = list.find(m=>m.id === id)
+    if(!member) return
+    document.getElementById('editId').value = member.id
+    document.getElementById('editName').value = member.name
+    document.getElementById('editPhone').value = member.phone
+    document.getElementById('editGender').value = member.gender
+    document.getElementById('editBirthday').value = member.birthday
+    document.getElementById('editMtype').value = member.mtype
+    document.getElementById('editBalance').value = member.balance
+    document.getElementById('editRemark').value = member.remark
+    document.getElementById('editModal').classList.add('show')
+}
+function closeModal(){
+    document.getElementById('editModal').classList.remove('show')
+}
+function saveEdit(){
+    const id = Number(document.getElementById('editId').value)
+    const name = document.getElementById('editName').value.trim()
+    const phone = document.getElementById('editPhone').value.trim()
+    if(!name || !phone){
+        alert('姓名和手机号不能为空！')
+        return
+    }
+    let list = getMembers()
+    const idx = list.findIndex(m=>m.id === id)
+    if(idx>-1){
+        list[idx].name = name
+        list[idx].phone = phone
+        list[idx].gender = document.getElementById('editGender').value
+        list[idx].birthday = document.getElementById('editBirthday').value
+        list[idx].mtype = document.getElementById('editMtype').value
+        list[idx].balance = Number(document.getElementById('editBalance').value)||0
+        list[idx].remark = document.getElementById('editRemark').value
+        saveMembers(list)
+        alert('✅修改成功')
+        closeModal()
+        renderTable()
+    }
+}
+
+//==== 到店服务记录 ====
+function openLog(id){
+    document.getElementById('logMemberId').value = id
+    document.getElementById('serviceItem').value = ''
+    document.getElementById('serviceCost').value = ''
+    document.getElementById('serviceRemark').value = ''
+    renderLogList(id)
+    document.getElementById('logModal').classList.add('show')
+}
+function closeLogModal(){
+    document.getElementById('logModal').classList.remove('show')
+}
+function renderLogList(memberId){
+    const list = getMembers()
+    const member = list.find(m=>m.id === memberId)
+    const logWrap = document.getElementById('logList')
+    logWrap.innerHTML = ''
+    if(!member || !member.logs || member.logs.length===0){
+        logWrap.innerHTML = '<div class="log-item">暂无服务记录</div>'
+        return
+    }
+    member.logs.slice().reverse().forEach(log=>{
+        logWrap.innerHTML += `
+        <div class="log-item">
+            <div class="log-title">${log.time}</div>
+            <div>项目：${log.item}</div>
+            <div>扣减：${log.cost}</div>
+            <div>备注：${log.remark||'无'}</div>
+        </div>
+        `
+    })
+}
+function addServiceLog(){
+    const mid = Number(document.getElementById('logMemberId').value)
+    const serviceItem = document.getElementById('serviceItem').value.trim()
+    const cost = Number(document.getElementById('serviceCost').value)
+    const sRemark = document.getElementById('serviceRemark').value.trim()
+    if(!serviceItem || isNaN(cost) || cost <=0){
+        alert('请选择服务项目和有效的扣减次数/金额！')
+        return
+    }
+    let list = getMembers()
+    const member = list.find(m=>m.id === mid)
+    if(!member) return
+    if(member.balance < cost){
+        if(!confirm(`剩余${member.balance}，本次扣${cost}，余额不足，确定继续登记吗？`)) return
+    }
+    const logObj = {
+        time:getNowTime(),
+        item:serviceItem,
+        cost:cost,
+        remark:sRemark
+    }
+    if(!member.logs) member.logs = []
+    member.logs.push(logObj)
+    member.balance = Number(member.balance) - cost
+    saveMembers(list)
+    alert('✅服务记录登记成功，余额已自动扣减！')
+    renderLogList(mid)
+    renderTable()
+    document.getElementById('serviceItem').value=''
+    document.getElementById('serviceCost').value=''
+    document.getElementById('serviceRemark').value=''
+}
+
+//==== 储值充值模块 ====
+function openRecharge(id){
+    document.getElementById('rechargeMemberId').value = id
+    document.getElementById('rechargePackage').value=''
+    document.getElementById('rechargeMoney').value=''
+    document.getElementById('giftMoney').value='0'
+    document.getElementById('rechargeRemark').value=''
+    renderRechargeList(id)
+    document.getElementById('rechargeModal').classList.add('show')
+}
+function closeRechargeModal(){
+    document.getElementById('rechargeModal').classList.remove('show')
+}
+function renderRechargeList(memberId){
+    const list = getMembers()
+    const member = list.find(m=>m.id === memberId)
+    const recWrap = document.getElementById('rechargeList')
+    recWrap.innerHTML=''
+    if(!member || !member.rechargeLogs || member.rechargeLogs.length===0){
+        recWrap.innerHTML='<div class="log-item">暂无充值记录</div>'
+        return
+    }
+    member.rechargeLogs.slice().reverse().forEach(r=>{
+        recWrap.innerHTML += `
+        <div class="log-item">
+            <div class="log-title">${r.time}</div>
+            <div>充值本金：${r.money}</div>
+            <div>赠送金额：${r.gift}</div>
+            <div>备注：${r.remark||'无'}</div>
+        </div>
+        `
+    })
+}
+function addRecharge(){
+    const mid = Number(document.getElementById('rechargeMemberId').value)
+    const money = Number(document.getElementById('rechargeMoney').value)
+    const gift = Number(document.getElementById('giftMoney').value||0)
+    const rRemark = document.getElementById('rechargeRemark').value.trim()
+    if(isNaN(money) || money <=0){
+        alert('请输入有效的充值本金！')
+        return
+    }
+    let list = getMembers()
+    const member = list.find(m=>m.id === mid)
+    if(!member) return
+    const recObj = {
+        time:getNowTime(),
+        money:money,
+        gift:gift,
+        remark:rRemark
+    }
+    if(!member.rechargeLogs) member.rechargeLogs=[]
+    member.rechargeLogs.push(recObj)
+    member.balance = Number(member.balance)+money+gift
+    saveMembers(list)
+    alert('✅充值记录保存成功，余额自动增加！')
+    renderRechargeList(mid)
+    renderTable()
+    document.getElementById('rechargePackage').value=''
+    document.getElementById('rechargeMoney').value=''
+    document.getElementById('giftMoney').value='0'
+    document.getElementById('rechargeRemark').value=''
+}
+
+//==== 导出CSV（会员+服务记录+充值记录）====
+function exportCsv(){
+    const list = getMembers()
+    if(list.length===0){
+        alert('暂无会员数据，无法导出')
+        return
+    }
+    let csv = "姓名,手机号,性别,生日,会员类型,余额/次数,会员备注,登记时间,类型,项目/充值说明,金额/次数,时间,备注\n"
+    list.forEach(m=>{
+        //会员基础信息行
+        const mRemark = `"${(m.remark||'').replace(/"/g,'""')}"`
+        //服务记录
+        if(m.logs && m.logs.length>0){
+            m.logs.forEach(l=>{
+                const lremark = `"${(l.remark||'').replace(/"/g,'""')}"`
+                csv += `${m.name},${m.phone},${m.gender},${m.birthday||''},${m.mtype},${m.balance},${mRemark},${m.regtime},服务记录,${l.item},${l.cost},${l.time},${lremark}\n`
+            })
+        }
+        //充值记录
+        if(m.rechargeLogs && m.rechargeLogs.length>0){
+            m.rechargeLogs.forEach(r=>{
+                const rremark = `"${(r.remark||'').replace(/"/g,'""')}"`
+                csv += `${m.name},${m.phone},${m.gender},${m.birthday||''},${m.mtype},${m.balance},${mRemark},${m.regtime},充值记录,本金${r.money}+赠送${r.gift},${Number(r.money)+Number(r.gift)},${r.time},${rremark}\n`
+            })
+        }
+        //没有任何记录时保留基础档案
+        if((!m.logs||m.logs.length===0) && (!m.rechargeLogs||m.rechargeLogs.length===0)){
+            csv += `${m.name},${m.phone},${m.gender},${m.birthday||''},${m.mtype},${m.balance},${mRemark},${m.regtime},,,,, \n`
+        }
+    })
+    const blob = new Blob([csv],{type:"text/csv;charset=utf-8"})
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `骨语推拿_会员档案_${getNowTime().substring(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+}
+</script>
+</body>
+</html>
